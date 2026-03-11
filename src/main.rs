@@ -1,6 +1,14 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use axum::extract::ws::{Message, WebSocket};
+use axum::{
+    Router,
+    extract::{
+        State, WebSocketUpgrade,
+        ws::{Message, WebSocket},
+    },
+    response::IntoResponse,
+    routing::get,
+};
 use futures::{SinkExt, StreamExt, channel::mpsc};
 use serde_json::Value;
 use tokio::{
@@ -16,7 +24,25 @@ struct AppState {
 
 #[tokio::main]
 async fn main() {
-    println!("Hello, world!");
+    let state = AppState {
+        connections: Arc::new(Mutex::new(HashMap::new())),
+    };
+
+    let app = Router::new()
+        .route("/ws", get(websocket_handler))
+        .with_state(state);
+
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await.unwrap();
+
+    println!("Server running on http://localhost:8000");
+    axum::serve(listener, app).await.unwrap();
+}
+
+async fn websocket_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| handle_socket(socket, state))
 }
 
 async fn handle_socket(socket: WebSocket, state: AppState) {
