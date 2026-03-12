@@ -117,7 +117,17 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                                 if let Some(target_tx) =
                                     state.connections.lock().await.get(target_id)
                                 {
-                                    let _ = target_tx.send(Message::Text(text));
+                                    let mut value: Value =
+                                        serde_json::from_str(&text).unwrap_or(Value::Null);
+
+                                    if let Some(obj) = value.as_object_mut() {
+                                        obj.insert(
+                                            "senderId".to_string(),
+                                            Value::String(conn_id.clone()),
+                                        );
+                                    }
+
+                                    let _ = target_tx.send(Message::Text(value.to_string()));
                                 }
                             }
                         }
